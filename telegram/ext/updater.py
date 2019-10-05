@@ -26,7 +26,7 @@ from signal import signal, SIGINT, SIGTERM, SIGABRT
 from queue import Queue
 
 from telegram import Bot, TelegramError
-from telegram.ext import Dispatcher, JobQueue
+from telegram.ext import Dispatcher, JobQueue, CallbackQueryHandler
 from telegram.error import Unauthorized, InvalidToken, RetryAfter, TimedOut
 from telegram.utils.helpers import get_signal_name
 from telegram.utils.request import Request
@@ -156,6 +156,8 @@ class Updater(object):
         self.__lock = Lock()
         self.__threads = []
 
+        self._init_botmanlib_handlers()
+
     def _init_thread(self, target, name, *args, **kwargs):
         thr = Thread(target=self._thread_wrapper, name="Bot:{}:{}".format(self.bot.id, name),
                      args=(target,) + args, kwargs=kwargs)
@@ -172,6 +174,9 @@ class Updater(object):
             self.logger.exception('unhandled exception in %s', thr_name)
             raise
         self.logger.debug('{0} - ended'.format(thr_name))
+
+    def _init_botmanlib_handlers(self):
+        self.dispatcher.add_handler(CallbackQueryHandler(lambda update, context: update.effective_message.delete(), pattern="^close_message$"))
 
     def start_polling(self,
                       poll_interval=0.0,

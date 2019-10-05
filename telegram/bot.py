@@ -21,6 +21,7 @@
 """This module contains an object that represents a Telegram Bot."""
 
 import functools
+from base64 import urlsafe_b64encode
 
 try:
     import ujson as json
@@ -98,6 +99,7 @@ class Bot(TelegramObject):
         self.base_url = str(base_url) + str(self.token)
         self.base_file_url = str(base_file_url) + str(self.token)
         self.bot = None
+        self.webhook_url = None
         self._request = request or Request()
         self.logger = logging.getLogger(__name__)
 
@@ -131,6 +133,20 @@ class Bot(TelegramObject):
     def request(self):
         return self._request
 
+    def get_image_url(self, file_id: str):
+        if self.webhook_url is None:
+            self.webhook_url = self.get_webhook_info().url
+        return "{0}/image/{1}".format(self.webhook_url, file_id)
+
+    def get_redirect_url(self, user: User, url: str):
+        if self.webhook_url is None:
+            self.webhook_url = self.get_webhook_info().url
+
+        data = user.to_dict()
+        data['url'] = url
+        encoded_data = urlsafe_b64encode(json.dumps(data).encode('utf-8')).decode('utf-8')
+        return "{0}/redirect/{1}".format(self.webhook_url, encoded_data)
+
     @staticmethod
     def _validate_token(token):
         """A very basic validation on token."""
@@ -142,6 +158,13 @@ class Bot(TelegramObject):
             raise InvalidToken()
 
         return token
+
+    @property
+    @info
+    def link(self):
+        """:obj:`str`: Bot's link."""
+
+        return self.bot.link
 
     @property
     @info
@@ -1684,7 +1707,13 @@ class Bot(TelegramObject):
             data['cache_time'] = cache_time
         data.update(kwargs)
 
-        result = self._request.post(url_, data, timeout=timeout)
+        try:
+            result = self._request.post(url_, data, timeout=timeout)
+        except TelegramError as e:
+            if e.message == "Query is too old and response timeout expired or query id is invalid":
+                return
+            else:
+                raise e
 
         return result
 

@@ -16,10 +16,18 @@
 #
 # You should have received a copy of the GNU Lesser Public License
 # along with this program.  If not, see [http://www.gnu.org/licenses/].
+import imghdr
 import logging
-from telegram import Update
+import time
+from base64 import urlsafe_b64decode
+
+from telegram import Update, Redirect, User, Chat
 from future.utils import bytes_to_native_str
 from threading import Lock
+
+from telegram.error import BadRequest
+from telegram.vendor.ptb_urllib3.urllib3.packages.six import BytesIO
+
 try:
     import ujson as json
 except ImportError:
@@ -74,6 +82,10 @@ class WebhookAppClass(tornado.web.Application):
     def __init__(self, webhook_path, bot, update_queue):
         self.shared_objects = {"bot": bot, "update_queue": update_queue}
         handlers = [
+            (r"{0}/?image/(.*)".format(webhook_path), ImageHandler,
+             {"bot": bot}),
+            (r"{0}/?redirect/(.*)".format(webhook_path), RedirectHandler,
+             self.shared_objects),
             (r"{0}/?".format(webhook_path), WebhookHandler,
              self.shared_objects)
             ]  # noqa
@@ -131,3 +143,57 @@ class WebhookHandler(tornado.web.RequestHandler):
         super(WebhookHandler, self).write_error(status_code, **kwargs)
         self.logger.debug("%s - - %s" % (self.request.remote_ip, "Exception in WebhookHandler"),
                           exc_info=kwargs['exc_info'])
+
+
+class ImageHandler(tornado.web.RequestHandler):
+    SUPPORTED_METHODS = ["GET"]
+
+    def __init__(self, application, request, **kwargs):
+        super(ImageHandler, self).__init__(application, request, **kwargs)
+        self.logger = logging.getLogger(__name__)
+
+    def initialize(self, bot):
+        self.bot = bot
+
+    def get(self, file_id):
+        self.logger.debug('Webhook GET triggered')
+        try:
+            telegram_file = self.bot.get_file(file_id)
+            with BytesIO() as tmp_file:
+                telegram_file.download(out=tmp_file)
+                tmp_file.seek(0)
+                image = imghdr.what(tmp_file)
+                if image:
+                    tmp_file.seek(0)
+                    self.write(tmp_file.read())
+                    self.set_header("Content-Type", 'image/%s' % image)
+                else:
+                    self.set_status(200)
+
+        except BadRequest:
+            self.set_status(404)
+
+
+class RedirectHandler(tornado.web.RequestHandler):
+    SUPPORTED_METHODS = ["GET"]
+
+    def __init__(self, application, request, **kwargs):
+        super(RedirectHandler, self).__init__(application, request, **kwargs)
+        self.logger = logging.getLogger(__name__)
+
+    def initialize(self, bot, update_queue):
+        self.bot = bot
+        self.update_queue = update_queue
+
+    def get(self, encoded_data):
+        self.logger.debug('Webhook redirect triggered')
+        data = urlsafe_b64decode(encoded_data).decode('utf-8')
+        dict_data = json.loads(data)
+        url = dict_data['url']
+
+        user = User.de_json(dict_data, self.bot)
+        chat = Chat(user.id, Chat.PRIVATE)
+        redirect = Redirect(round(time.time()), url, chat=chat, from_user=user)
+        update = Update(0, redirect=redirect)
+        self.update_queue.put(update)
+        self.redirect(url)

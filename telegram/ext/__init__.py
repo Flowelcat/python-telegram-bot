@@ -25,8 +25,8 @@ from .handler import Handler
 from .callbackcontext import CallbackContext
 from .dispatcher import Dispatcher, DispatcherHandlerStop, run_async
 from .jobqueue import JobQueue, Job
-from .updater import Updater
 from .callbackqueryhandler import CallbackQueryHandler
+from .updater import Updater
 from .choseninlineresulthandler import ChosenInlineResultHandler
 from .inlinequeryhandler import InlineQueryHandler
 from .filters import BaseFilter, Filters

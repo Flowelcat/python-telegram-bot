@@ -67,6 +67,7 @@ class Update(TelegramObject):
             pre-checkout query. Contains full information about checkout
         poll (:class:`telegram.Poll`, optional): New poll state. Bots receive only updates
             about polls, which are sent or stopped by the bot
+        redirect (:class:`telegram.Redirect`, optional): User redirect
         **kwargs (:obj:`dict`): Arbitrary keyword arguments.
 
     """
@@ -83,6 +84,7 @@ class Update(TelegramObject):
                  shipping_query=None,
                  pre_checkout_query=None,
                  poll=None,
+                 redirect=None,
                  **kwargs):
         # Required
         self.update_id = int(update_id)
@@ -97,6 +99,7 @@ class Update(TelegramObject):
         self.channel_post = channel_post
         self.edited_channel_post = edited_channel_post
         self.poll = poll
+        self.redirect = redirect
 
         self._effective_user = None
         self._effective_chat = None
@@ -137,6 +140,9 @@ class Update(TelegramObject):
         elif self.pre_checkout_query:
             user = self.pre_checkout_query.from_user
 
+        elif self.redirect:
+            user = self.redirect.from_user
+
         self._effective_user = user
         return user
 
@@ -168,6 +174,9 @@ class Update(TelegramObject):
 
         elif self.edited_channel_post:
             chat = self.edited_channel_post.chat
+
+        elif self.redirect:
+            chat = self.redirect.chat
 
         self._effective_chat = chat
         return chat

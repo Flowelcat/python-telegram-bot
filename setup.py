@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""The setup and build script for the python-telegram-bot library."""
+"""The setup and build script for the botman-telegram-bot library."""
 
 import codecs
 import os
@@ -25,12 +25,12 @@ with codecs.open('README.rst', 'r', 'utf-8') as fd:
         code = compile(fh.read(), fn, 'exec')
         exec(code)
 
-    setup(name='python-telegram-bot',
+    setup(name='botman-telegram-bot',
           version=__version__,
-          author='Leandro Toledo',
-          author_email='devs@python-telegram-bot.org',
+          author='Flowelcat',
+          author_email='Flowelcat@gmail.com',
           license='LGPLv3',
-          url='https://python-telegram-bot.org/',
+          url='https://gitlab.com/botman_bots/botman-telegram-bot',
           keywords='python telegram bot api wrapper',
           description="We have made you a wrapper you can't refuse",
           long_description=fd.read(),
