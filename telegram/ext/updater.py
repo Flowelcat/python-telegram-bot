@@ -156,7 +156,7 @@ class Updater(object):
         self.__lock = Lock()
         self.__threads = []
 
-        self._init_botmanlib_handlers()
+        self._init_additional_handlers()
 
     def _init_thread(self, target, name, *args, **kwargs):
         thr = Thread(target=self._thread_wrapper, name="Bot:{}:{}".format(self.bot.id, name),
@@ -175,7 +175,7 @@ class Updater(object):
             raise
         self.logger.debug('{0} - ended'.format(thr_name))
 
-    def _init_botmanlib_handlers(self):
+    def _init_additional_handlers(self):
         self.dispatcher.add_handler(CallbackQueryHandler(lambda update, context: update.effective_message.delete(), pattern="^close_message$"))
 
     def start_polling(self,
