@@ -91,6 +91,18 @@ class TestBot(object):
 
     @flaky(3, 1)
     @pytest.mark.timeout(10)
+    def test_to_dict(self, bot):
+        to_dict_bot = bot.to_dict()
+
+        assert isinstance(to_dict_bot, dict)
+        assert to_dict_bot["id"] == bot.id
+        assert to_dict_bot["username"] == bot.username
+        assert to_dict_bot["first_name"] == bot.first_name
+        if bot.last_name:
+            assert to_dict_bot["last_name"] == bot.last_name
+
+    @flaky(3, 1)
+    @pytest.mark.timeout(10)
     def test_forward_message(self, bot, chat_id, message):
         message = bot.forward_message(chat_id, from_chat_id=chat_id, message_id=message.message_id)
 
@@ -102,13 +114,14 @@ class TestBot(object):
     @pytest.mark.timeout(10)
     def test_delete_message(self, bot, chat_id):
         message = bot.send_message(chat_id, text='will be deleted')
+        time.sleep(2)
 
         assert bot.delete_message(chat_id=chat_id, message_id=message.message_id) is True
 
     @flaky(3, 1)
     @pytest.mark.timeout(10)
     def test_delete_message_old_message(self, bot, chat_id):
-        with pytest.raises(TelegramError, match='Message to delete not found'):
+        with pytest.raises(BadRequest):
             # Considering that the first message is old enough
             bot.delete_message(chat_id=chat_id, message_id=1)
 
