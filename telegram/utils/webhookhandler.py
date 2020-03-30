@@ -213,9 +213,10 @@ class RedirectHandler(tornado.web.RequestHandler):
         super(RedirectHandler, self).__init__(application, request, **kwargs)
         self.logger = logging.getLogger(__name__)
 
-    def initialize(self, bot, update_queue):
+    def initialize(self, bot, update_queue, default_quote=None):
         self.bot = bot
         self.update_queue = update_queue
+        self._default_quote = default_quote
 
     def get(self, encoded_data):
         self.logger.debug('Webhook redirect triggered')
