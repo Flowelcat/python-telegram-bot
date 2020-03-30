@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 #
 # A library that provides a Python interface to the Telegram Bot API
-# Copyright (C) 2015-2018
+# Copyright (C) 2015-2020
 # Leandro Toledo de Souza <devs@python-telegram-bot.org>
 #
 # This program is free software: you can redistribute it and/or modify
@@ -38,6 +38,7 @@ from .files.videonote import VideoNote
 from .chataction import ChatAction
 from .userprofilephotos import UserProfilePhotos
 from .keyboardbutton import KeyboardButton
+from .keyboardbuttonpolltype import KeyboardButtonPollType
 from .replymarkup import ReplyMarkup
 from .replykeyboardmarkup import ReplyKeyboardMarkup
 from .replykeyboardremove import ReplyKeyboardRemove
@@ -48,7 +49,7 @@ from .files.file import File
 from .parsemode import ParseMode
 from .messageentity import MessageEntity
 from .games.game import Game
-from .poll import Poll, PollOption
+from .poll import Poll, PollOption, PollAnswer
 from .redirect import Redirect
 from .loginurl import LoginUrl
 from .games.callbackgame import CallbackGame
@@ -139,7 +140,7 @@ __all__ = [
     'InlineQueryResultPhoto', 'InlineQueryResultVenue', 'InlineQueryResultVideo',
     'InlineQueryResultVoice', 'InlineQueryResultGame', 'InputContactMessageContent', 'InputFile',
     'InputLocationMessageContent', 'InputMessageContent', 'InputTextMessageContent',
-    'InputVenueMessageContent', 'KeyboardButton', 'Location', 'EncryptedCredentials',
+    'InputVenueMessageContent', 'Location', 'EncryptedCredentials',
     'PassportFile', 'EncryptedPassportElement', 'PassportData', 'Message', 'MessageEntity',
     'ParseMode', 'PhotoSize', 'ReplyKeyboardRemove', 'ReplyKeyboardMarkup', 'ReplyMarkup',
     'Sticker', 'TelegramError', 'TelegramObject', 'Update', 'User', 'UserProfilePhotos', 'Venue',
@@ -157,5 +158,5 @@ __all__ = [
     'InputMediaAudio', 'InputMediaDocument', 'TelegramDecryptionError',
     'PassportElementErrorSelfie', 'PassportElementErrorTranslationFile',
     'PassportElementErrorTranslationFiles', 'PassportElementErrorUnspecified', 'Poll',
-    'PollOption', 'Redirect', 'LoginUrl'
+    'PollOption', 'PollAnswer', 'LoginUrl', 'KeyboardButton', 'KeyboardButtonPollType', 'Redirect',
 ]

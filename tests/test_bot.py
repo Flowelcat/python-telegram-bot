@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 #
 # A library that provides a Python interface to the Telegram Bot API
-# Copyright (C) 2015-2018
+# Copyright (C) 2015-2020
 # Leandro Toledo de Souza <devs@python-telegram-bot.org>
 #
 # This program is free software: you can redistribute it and/or modify
@@ -16,10 +16,8 @@
 #
 # You should have received a copy of the GNU Lesser Public License
 # along with this program.  If not, see [http://www.gnu.org/licenses/].
-import os
-import sys
 import time
-from datetime import datetime
+import datetime as dtm
 from platform import python_implementation
 
 import pytest
@@ -28,9 +26,10 @@ from future.utils import string_types
 
 from telegram import (Bot, Update, ChatAction, TelegramError, User, InlineKeyboardMarkup,
                       InlineKeyboardButton, InlineQueryResultArticle, InputTextMessageContent,
-                      ShippingOption, LabeledPrice, ChatPermissions, Poll)
+                      ShippingOption, LabeledPrice, ChatPermissions, Poll,
+                      InlineQueryResultDocument)
 from telegram.error import BadRequest, InvalidToken, NetworkError, RetryAfter
-from telegram.utils.helpers import from_timestamp
+from telegram.utils.helpers import from_timestamp, escape_markdown
 
 BASE_TIME = time.time()
 HIGHSCORE_DELTA = 1450000000
@@ -88,6 +87,10 @@ class TestBot(object):
         assert get_me_bot.first_name == bot.first_name
         assert get_me_bot.last_name == bot.last_name
         assert get_me_bot.name == bot.name
+        assert get_me_bot.can_join_groups == bot.can_join_groups
+        assert get_me_bot.can_read_all_group_messages == bot.can_read_all_group_messages
+        assert get_me_bot.supports_inline_queries == bot.supports_inline_queries
+        assert 'https://t.me/{}'.format(get_me_bot.username) == bot.link
 
     @flaky(3, 1)
     @pytest.mark.timeout(10)
@@ -108,7 +111,7 @@ class TestBot(object):
 
         assert message.text == message.text
         assert message.forward_from.username == message.from_user.username
-        assert isinstance(message.forward_date, datetime)
+        assert isinstance(message.forward_date, dtm.datetime)
 
     @flaky(3, 1)
     @pytest.mark.timeout(10)
@@ -175,14 +178,17 @@ class TestBot(object):
         question = 'Is this a test?'
         answers = ['Yes', 'No', 'Maybe']
         message = bot.send_poll(chat_id=super_group_id, question=question, options=answers,
-                                timeout=60)
+                                is_anonymous=False, allows_multiple_answers=True, timeout=60)
 
         assert message.poll
         assert message.poll.question == question
         assert message.poll.options[0].text == answers[0]
         assert message.poll.options[1].text == answers[1]
         assert message.poll.options[2].text == answers[2]
+        assert not message.poll.is_anonymous
+        assert message.poll.allows_multiple_answers
         assert not message.poll.is_closed
+        assert message.poll.type == Poll.REGULAR
 
         poll = bot.stop_poll(chat_id=super_group_id, message_id=message.message_id, timeout=60)
         assert isinstance(poll, Poll)
@@ -194,6 +200,13 @@ class TestBot(object):
         assert poll.options[2].text == answers[2]
         assert poll.options[2].voter_count == 0
         assert poll.question == question
+        assert poll.total_voter_count == 0
+
+        message_quiz = bot.send_poll(chat_id=super_group_id, question=question, options=answers,
+                                     type=Poll.QUIZ, correct_option_id=2, is_closed=True)
+        assert message_quiz.poll.correct_option_id == 2
+        assert message_quiz.poll.type == Poll.QUIZ
+        assert message_quiz.poll.is_closed
 
     @flaky(3, 1)
     @pytest.mark.timeout(10)
@@ -236,6 +249,67 @@ class TestBot(object):
                                        next_offset='42',
                                        switch_pm_text='switch pm',
                                        switch_pm_parameter='start_pm')
+
+    def test_answer_inline_query_no_default_parse_mode(self, monkeypatch, bot):
+        def test(_, url, data, *args, **kwargs):
+            return data == {'cache_time': 300,
+                            'results': [{'title': 'test_result', 'id': '123', 'type': 'document',
+                                         'document_url': 'https://raw.githubusercontent.com/'
+                                         'python-telegram-bot/logos/master/logo/png/'
+                                         'ptb-logo_240.png', 'mime_type': 'image/png',
+                                         'caption': 'ptb_logo'}],
+                            'next_offset': '42', 'switch_pm_parameter': 'start_pm',
+                            'inline_query_id': 1234, 'is_personal': True,
+                            'switch_pm_text': 'switch pm'}
+
+        monkeypatch.setattr('telegram.utils.request.Request.post', test)
+        results = [InlineQueryResultDocument(
+            id='123',
+            document_url='https://raw.githubusercontent.com/python-telegram-bot/logos/master/'
+                         'logo/png/ptb-logo_240.png',
+            title='test_result',
+            mime_type='image/png',
+            caption='ptb_logo',
+        )]
+
+        assert bot.answer_inline_query(1234,
+                                       results=results,
+                                       cache_time=300,
+                                       is_personal=True,
+                                       next_offset='42',
+                                       switch_pm_text='switch pm',
+                                       switch_pm_parameter='start_pm')
+
+    @pytest.mark.parametrize('default_bot', [{'parse_mode': 'Markdown'}], indirect=True)
+    def test_answer_inline_query_default_parse_mode(self, monkeypatch, default_bot):
+        def test(_, url, data, *args, **kwargs):
+            return data == {'cache_time': 300,
+                            'results': [{'title': 'test_result', 'id': '123', 'type': 'document',
+                                         'document_url': 'https://raw.githubusercontent.com/'
+                                         'python-telegram-bot/logos/master/logo/png/'
+                                         'ptb-logo_240.png', 'mime_type': 'image/png',
+                                         'caption': 'ptb_logo', 'parse_mode': 'Markdown'}],
+                            'next_offset': '42', 'switch_pm_parameter': 'start_pm',
+                            'inline_query_id': 1234, 'is_personal': True,
+                            'switch_pm_text': 'switch pm'}
+
+        monkeypatch.setattr('telegram.utils.request.Request.post', test)
+        results = [InlineQueryResultDocument(
+            id='123',
+            document_url='https://raw.githubusercontent.com/python-telegram-bot/logos/master/'
+                         'logo/png/ptb-logo_240.png',
+            title='test_result',
+            mime_type='image/png',
+            caption='ptb_logo',
+        )]
+
+        assert default_bot.answer_inline_query(1234,
+                                               results=results,
+                                               cache_time=300,
+                                               is_personal=True,
+                                               next_offset='42',
+                                               switch_pm_text='switch pm',
+                                               switch_pm_parameter='start_pm')
 
     @flaky(3, 1)
     @pytest.mark.timeout(10)
@@ -288,6 +362,16 @@ class TestBot(object):
 
         assert bot.set_chat_permissions(2, chat_permissions)
 
+    def test_set_chat_administrator_custom_title(self, monkeypatch, bot):
+        def test(_, url, data, *args, **kwargs):
+            chat_id = data['chat_id'] == 2
+            user_id = data['user_id'] == 32
+            custom_title = data['custom_title'] == 'custom_title'
+            return chat_id and user_id and custom_title
+
+        monkeypatch.setattr('telegram.utils.request.Request.post', test)
+        assert bot.set_chat_administrator_custom_title(2, 32, 'custom_title')
+
     # TODO: Needs improvement. Need an incoming callbackquery to test
     def test_answer_callback_query(self, monkeypatch, bot):
         # For now just test that our internals pass the correct data
@@ -309,6 +393,34 @@ class TestBot(object):
 
         assert message.text == 'new_text'
 
+    @flaky(3, 1)
+    @pytest.mark.timeout(10)
+    @pytest.mark.parametrize('default_bot', [{'parse_mode': 'Markdown'}], indirect=True)
+    def test_edit_message_text_default_parse_mode(self, default_bot, message):
+        test_string = 'Italic Bold Code'
+        test_markdown_string = '_Italic_ *Bold* `Code`'
+
+        message = default_bot.edit_message_text(text=test_markdown_string, chat_id=message.chat_id,
+                                                message_id=message.message_id,
+                                                disable_web_page_preview=True)
+        assert message.text_markdown == test_markdown_string
+        assert message.text == test_string
+
+        message = default_bot.edit_message_text(text=test_markdown_string, chat_id=message.chat_id,
+                                                message_id=message.message_id, parse_mode=None,
+                                                disable_web_page_preview=True)
+        assert message.text == test_markdown_string
+        assert message.text_markdown == escape_markdown(test_markdown_string)
+
+        message = default_bot.edit_message_text(text=test_markdown_string, chat_id=message.chat_id,
+                                                message_id=message.message_id,
+                                                disable_web_page_preview=True)
+        message = default_bot.edit_message_text(text=test_markdown_string, chat_id=message.chat_id,
+                                                message_id=message.message_id, parse_mode='HTML',
+                                                disable_web_page_preview=True)
+        assert message.text == test_markdown_string
+        assert message.text_markdown == escape_markdown(test_markdown_string)
+
     @pytest.mark.skip(reason='need reference to an inline message')
     def test_edit_message_text_inline(self):
         pass
@@ -322,6 +434,36 @@ class TestBot(object):
         assert message.caption == 'new_caption'
 
     # edit_message_media is tested in test_inputmedia
+
+    @flaky(3, 1)
+    @pytest.mark.timeout(10)
+    @pytest.mark.parametrize('default_bot', [{'parse_mode': 'Markdown'}], indirect=True)
+    def test_edit_message_caption_default_parse_mode(self, default_bot, media_message):
+        test_string = 'Italic Bold Code'
+        test_markdown_string = '_Italic_ *Bold* `Code`'
+
+        message = default_bot.edit_message_caption(caption=test_markdown_string,
+                                                   chat_id=media_message.chat_id,
+                                                   message_id=media_message.message_id)
+        assert message.caption_markdown == test_markdown_string
+        assert message.caption == test_string
+
+        message = default_bot.edit_message_caption(caption=test_markdown_string,
+                                                   chat_id=media_message.chat_id,
+                                                   message_id=media_message.message_id,
+                                                   parse_mode=None)
+        assert message.caption == test_markdown_string
+        assert message.caption_markdown == escape_markdown(test_markdown_string)
+
+        message = default_bot.edit_message_caption(caption=test_markdown_string,
+                                                   chat_id=media_message.chat_id,
+                                                   message_id=media_message.message_id)
+        message = default_bot.edit_message_caption(caption=test_markdown_string,
+                                                   chat_id=media_message.chat_id,
+                                                   message_id=media_message.message_id,
+                                                   parse_mode='HTML')
+        assert message.caption == test_markdown_string
+        assert message.caption_markdown == escape_markdown(test_markdown_string)
 
     @flaky(3, 1)
     @pytest.mark.timeout(10)
@@ -373,8 +515,6 @@ class TestBot(object):
     @flaky(3, 1)
     @pytest.mark.timeout(15)
     @pytest.mark.xfail
-    @pytest.mark.skipif(os.getenv('APPVEYOR') and (sys.version_info < (3, 6)),
-                        reason='only run on 3.6 on appveyor')
     def test_set_webhook_get_webhook_info_and_delete_webhook(self, bot):
         url = 'https://python-telegram-bot.org/test/webhook'
         max_connections = 7
@@ -408,6 +548,20 @@ class TestBot(object):
         assert chat.type == 'supergroup'
         assert chat.title == '>>> telegram.Bot(test)'
         assert chat.id == int(super_group_id)
+
+    # TODO: Add bot to group to test there too
+    @flaky(3, 1)
+    @pytest.mark.timeout(10)
+    @pytest.mark.parametrize('default_bot', [{'quote': True}], indirect=True)
+    def test_get_chat_default_quote(self, default_bot, super_group_id):
+        message = default_bot.send_message(super_group_id, text="test_get_chat_default_quote")
+        assert default_bot.pin_chat_message(chat_id=super_group_id, message_id=message.message_id,
+                                            disable_notification=True)
+
+        chat = default_bot.get_chat(super_group_id)
+        assert chat.pinned_message.default_quote is True
+
+        assert default_bot.unpinChatMessage(super_group_id)
 
     @flaky(3, 1)
     @pytest.mark.timeout(10)
@@ -615,7 +769,7 @@ class TestBot(object):
             assert bot.restrict_chat_member(channel_id,
                                             95205500,
                                             chat_permissions,
-                                            until_date=datetime.now())
+                                            until_date=dtm.datetime.utcnow())
 
     @flaky(3, 1)
     @pytest.mark.timeout(10)
@@ -663,6 +817,8 @@ class TestBot(object):
         assert bot.set_chat_description(channel_id, 'Time: ' + str(time.time()))
 
     # TODO: Add bot to group to test there too
+    @flaky(3, 1)
+    @pytest.mark.timeout(10)
     def test_pin_and_unpin_message(self, bot, super_group_id):
         message = bot.send_message(super_group_id, text="test_pin_message")
         assert bot.pin_chat_message(chat_id=super_group_id, message_id=message.message_id,
@@ -722,3 +878,29 @@ class TestBot(object):
         # Test file uploading
         with pytest.raises(OkException):
             bot.send_photo(chat_id, open('tests/data/telegram.jpg', 'rb'))
+
+    @flaky(3, 1)
+    @pytest.mark.timeout(10)
+    @pytest.mark.parametrize('default_bot', [{'parse_mode': 'Markdown'}], indirect=True)
+    def test_send_message_default_parse_mode(self, default_bot, chat_id):
+        test_string = 'Italic Bold Code'
+        test_markdown_string = '_Italic_ *Bold* `Code`'
+
+        message = default_bot.send_message(chat_id, test_markdown_string)
+        assert message.text_markdown == test_markdown_string
+        assert message.text == test_string
+
+        message = default_bot.send_message(chat_id, test_markdown_string, parse_mode=None)
+        assert message.text == test_markdown_string
+        assert message.text_markdown == escape_markdown(test_markdown_string)
+
+        message = default_bot.send_message(chat_id, test_markdown_string, parse_mode='HTML')
+        assert message.text == test_markdown_string
+        assert message.text_markdown == escape_markdown(test_markdown_string)
+
+    @flaky(3, 1)
+    @pytest.mark.timeout(10)
+    @pytest.mark.parametrize('default_bot', [{'quote': True}], indirect=True)
+    def test_send_message_default_quote(self, default_bot, chat_id):
+        message = default_bot.send_message(chat_id, 'test')
+        assert message.default_quote is True
