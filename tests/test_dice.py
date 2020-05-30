@@ -17,4 +17,32 @@
 # You should have received a copy of the GNU Lesser Public License
 # along with this program.  If not, see [http://www.gnu.org/licenses/].
 
-__version__ = '12.7-botman1.3'
+import pytest
+
+from telegram import Dice
+
+
+@pytest.fixture(scope="class",
+                params=Dice.ALL_EMOJI)
+def dice(request):
+    return Dice(value=5, emoji=request.param)
+
+
+class TestDice(object):
+    value = 4
+
+    @pytest.mark.parametrize('emoji', Dice.ALL_EMOJI)
+    def test_de_json(self, bot, emoji):
+        json_dict = {'value': self.value, 'emoji': emoji}
+        dice = Dice.de_json(json_dict, bot)
+
+        assert dice.value == self.value
+        assert dice.emoji == emoji
+        assert Dice.de_json(None, bot) is None
+
+    def test_to_dict(self, dice):
+        dice_dict = dice.to_dict()
+
+        assert isinstance(dice_dict, dict)
+        assert dice_dict['value'] == dice.value
+        assert dice_dict['emoji'] == dice.emoji
